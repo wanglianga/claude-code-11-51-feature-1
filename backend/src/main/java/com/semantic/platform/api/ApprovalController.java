@@ -34,7 +34,8 @@ public class ApprovalController {
                 (String) body.get("metricKey"),
                 Integer.valueOf(body.get("toVersion").toString()),
                 (String) body.getOrDefault("changeType", "edit"),
-                user == null ? "system" : user);
+                user == null ? "system" : user,
+                body.get("purpose") == null ? null : body.get("purpose").toString());
     }
 
     @PostMapping("/{id}/approve")

@@ -29,7 +29,7 @@
     <el-dialog v-model="dialogVisible" title="新建指标" width="600px">
       <el-form :model="form" label-width="100px">
         <el-form-item label="指标键">
-          <el-input v-model="form.metricKey" placeholder="如 net_sales" />
+          <el-input v-model="form.metricKey" placeholder="如 net_sales_financial" />
         </el-form-item>
         <el-form-item label="名称">
           <el-input v-model="form.name" placeholder="如 净销售额" />
@@ -38,6 +38,13 @@
           <el-select v-model="form.grain" placeholder="选择粒度">
             <el-option label="日" value="day" />
             <el-option label="月" value="month" />
+          </el-select>
+        </el-form-item>
+        <el-form-item label="退款用途">
+          <el-select v-model="form.purpose" clearable placeholder="不绑定（用途模板/非退款指标）">
+            <el-option label="财务发生（按入账日）" value="financial" />
+            <el-option label="运营订单（按原交易日）" value="order_batch" />
+            <el-option label="对账复算（仅校验）" value="reconciliation" />
           </el-select>
         </el-form-item>
         <el-form-item label="定义">
@@ -65,6 +72,7 @@ const form = ref({
   metricKey: '',
   name: '',
   grain: 'day',
+  purpose: '',
   definition: ''
 })
 
@@ -78,7 +86,7 @@ async function loadMetrics() {
 }
 
 function createMetric() {
-  form.value = { metricKey: '', name: '', grain: 'day', definition: '' }
+  form.value = { metricKey: '', name: '', grain: 'day', purpose: '', definition: '' }
   dialogVisible.value = true
 }
 
@@ -88,6 +96,7 @@ async function saveDraft() {
       metricKey: form.value.metricKey,
       name: form.value.name,
       grain: form.value.grain,
+      purpose: form.value.purpose || null,
       definition: form.value.definition
     })
     ElMessage.success('草稿保存成功')

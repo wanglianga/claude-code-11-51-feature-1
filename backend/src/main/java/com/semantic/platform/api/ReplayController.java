@@ -25,8 +25,16 @@ public class ReplayController {
         String storeId = (String) body.get("storeId");
         LocalDate businessDate = LocalDate.parse((String) body.get("businessDate"));
         BigDecimal amount = new BigDecimal(body.get("amount").toString());
+        String orderLineId = (String) body.get("orderLineId");
+        LocalDate originalBusinessDate = body.get("originalBusinessDate") == null ? null
+                : LocalDate.parse((String) body.get("originalBusinessDate"));
+        int direction = body.get("direction") == null ? 1 : Integer.parseInt(body.get("direction").toString());
+        Integer quantity = body.get("quantity") == null ? null : Integer.valueOf(body.get("quantity").toString());
+        String sku = body.get("sku") == null ? null : body.get("sku").toString();
+        String reason = body.get("reason") == null ? "迟到退款" : body.get("reason").toString();
         return replayService.lateRefund(
                 refundId == null ? "R-LATE-" + System.currentTimeMillis() : refundId,
-                orderId, storeId, businessDate, amount);
+                orderId, orderLineId, storeId, businessDate, originalBusinessDate, direction,
+                amount, quantity, sku, reason);
     }
 }

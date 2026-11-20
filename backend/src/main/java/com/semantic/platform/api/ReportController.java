@@ -50,8 +50,14 @@ public class ReportController {
 
     @PostMapping("/{id}/correct")
     public ReportItem correct(@PathVariable Long id, @RequestBody Map<String, Object> body) {
+        String purpose = body.get("purpose") == null ? null : body.get("purpose").toString();
+        Long expectedSemanticsId = body.get("expectedSemanticsId") == null ? null
+                : Long.valueOf(body.get("expectedSemanticsId").toString());
+        Integer expectedRevision = body.get("expectedRevision") == null ? null
+                : Integer.valueOf(body.get("expectedRevision").toString());
         return reportService.correctItem(id,
                 (String) body.get("metricKey"),
-                Long.valueOf(body.get("newRunId").toString()));
+                Long.valueOf(body.get("newRunId").toString()),
+                purpose, expectedSemanticsId, expectedRevision);
     }
 }

@@ -21,6 +21,10 @@ public class RunController {
         this.runService = runService;
     }
 
+    /**
+     * 执行运行。purpose 必须是请求显式给出的 financial / order_batch（或仅校验用的 reconciliation）；
+     * 未选择用途的请求会被拒绝，不默认为最近使用分支。
+     */
     @PostMapping
     public Run execute(@RequestBody Map<String, Object> body) {
         String metricKey = (String) body.get("metricKey");
@@ -29,7 +33,11 @@ public class RunController {
         LocalDate to = LocalDate.parse((String) body.get("to"));
         String grain = (String) body.getOrDefault("grain", "day");
         String scope = body.get("scope") == null ? null : body.get("scope").toString();
-        return runService.execute(metricKey, versionId, from, to, grain, scope);
+        String purpose = body.get("purpose") == null ? null : body.get("purpose").toString();
+        Long semanticsId = body.get("semanticsId") == null ? null : Long.valueOf(body.get("semanticsId").toString());
+        Integer revision = body.get("attributionRevision") == null ? null
+                : Integer.valueOf(body.get("attributionRevision").toString());
+        return runService.execute(metricKey, versionId, from, to, grain, scope, purpose, semanticsId, revision);
     }
 
     @GetMapping
@@ -45,6 +53,12 @@ public class RunController {
     @GetMapping("/{id}/cells")
     public List<RunCell> cells(@PathVariable Long id) {
         return runService.cells(id);
+    }
+
+    /** 按原输入复演（用途/口径版本/归属修订固定）。 */
+    @PostMapping("/{id}/replay")
+    public Map<String, Object> replay(@PathVariable Long id) {
+        return runService.replay(id);
     }
 
     @GetMapping("/{id}/lineage")

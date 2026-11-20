@@ -7,4 +7,5 @@ public interface MetricEdgeRepository extends JpaRepository<MetricEdge, Long> {
     List<MetricEdge> findByFromMetric(String fromMetric);
     List<MetricEdge> findByToMetric(String toMetric);
     void deleteByFromMetricAndFromVersion(String fromMetric, Integer fromVersion);
+    List<MetricEdge> findByToMetricAndPurpose(String toMetric, String purpose);
 }

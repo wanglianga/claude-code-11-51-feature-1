@@ -75,7 +75,8 @@ public class Evaluator {
                 cellAcc.excluded.add(new CellValue.Lineage(recordType(source), recId, fieldVal, false, fr.reason));
                 continue;
             }
-            cellAcc.include(recordType(source), recId, fieldVal, measure);
+            cellAcc.include(recordType(source), recId, fieldVal, measure,
+                    source.equals("refund_attributions") ? attributionNote(rec) : null);
         }
 
         // 补齐“已覆盖但无记录”的宇宙单元格（仅对含 store 维度或全量的情况）
@@ -292,12 +293,23 @@ public class Evaluator {
 
     // ---------------- 引用 ----------------
     private Series evalRef(Expr.Ref r) {
-        Series cached = ctx.refCache.get(r.metric());
+        // 引用可携带显式用途：对账运行在同一表达式里分别求值两种用途，
+        // 求值期间切换上下文用途并恢复，缓存键含有效用途，绝不串用。
+        String previous = ctx.purpose;
+        String effective = r.purpose() != null && !r.purpose().isBlank() ? r.purpose() : previous;
+        String cacheKey = (effective == null ? "-" : effective) + "::" + r.metric();
+        Series cached = ctx.refCache.get(cacheKey);
         if (cached != null) return cached;
         Expr def = ctx.refResolver.apply(r.metric());
         if (def == null) throw new IllegalStateException("引用的指标未发布: " + r.metric());
-        Series result = eval(def);
-        ctx.refCache.put(r.metric(), result);
+        Series result;
+        try {
+            ctx.purpose = effective;
+            result = eval(def);
+        } finally {
+            ctx.purpose = previous;
+        }
+        ctx.refCache.put(cacheKey, result);
         return result;
     }
 
@@ -469,10 +481,39 @@ public class Evaluator {
                 }
             }
             case "refunds" -> {
+                // 原始退款事实没有用途：仅在显式用途缺失时作为兜底（正常情况下校验器已拒绝）。
+                if (ctx.purpose == null) {
+                    throw new IllegalStateException(
+                            "原始退款事实缺少退款时间口径：请使用 refund_attributions 并固定用途");
+                }
                 for (RefundFact r : ctx.refunds) {
                     Map<String, Object> extra = new HashMap<>();
                     extra.put("reason", r.getReason());
                     out.add(new Object[]{r.getStoreId(), r.getBusinessDate(), r.getRefundId(), r.getAmount(), extra});
+                }
+            }
+            case "refund_attributions" -> {
+                if (ctx.purpose == null || "reconciliation".equals(ctx.purpose)) {
+                    throw new IllegalStateException(
+                            "退款归属来源必须在单一用途（financial / order_batch）下求值；对账运行请通过显式用途的指标引用分别求值");
+                }
+                for (com.semantic.platform.semantics.RefundAttribution a : ctx.refundAttributions) {
+                    // 对账运行会同时装载两种用途：按当前求值用途过滤，绝不混合相加
+                    if (!ctx.purpose.equals(a.getPurpose())) continue;
+                    BigDecimal amount = a.getAmountSigned();
+                    Map<String, Object> extra = new HashMap<>();
+                    extra.put("refund_id", a.getRefundId());
+                    extra.put("order_id", a.getOrderId());
+                    extra.put("order_line_id", a.getOrderLineId());
+                    extra.put("purpose", a.getPurpose());
+                    extra.put("link_status", a.getLinkStatus());
+                    extra.put("quantity", a.getQuantity() == null ? null : BigDecimal.valueOf(a.getQuantity()));
+                    extra.put("direction", BigDecimal.valueOf(a.getDirection()));
+                    extra.put("sku", a.getSku());
+                    extra.put("posting_date", a.getPostingDate());
+                    extra.put("original_business_date", a.getOriginalBusinessDate());
+                    // 时间口径：归属日期即期间归属（财务=入账日，运营=原交易日）
+                    out.add(new Object[]{a.getStoreId(), a.getAttributionDate(), a.getRefundId(), amount, extra});
                 }
             }
             case "store_status" -> {
@@ -489,12 +530,26 @@ public class Evaluator {
         return out;
     }
 
+    /** 下钻说明：归属行的用途、归属日期与关联状态，便于消费端确认“这是哪种口径”。 */
+    @SuppressWarnings("unchecked")
+    private String attributionNote(Object[] rec) {
+        Map<String, Object> extra = (Map<String, Object>) rec[COL_EXTRA];
+        Object purpose = extra.get("purpose");
+        Object posting = extra.get("posting_date");
+        Object original = extra.get("original_business_date");
+        Object line = extra.get("order_line_id");
+        Object link = extra.get("link_status");
+        return "用途=" + purpose + ", 入账日=" + posting + ", 原交易日=" + original
+                + ", 原订单行=" + line + ", 关联=" + link;
+    }
+
     @SuppressWarnings("unchecked")
     private BigDecimal numericField(String source, String field, Object[] rec) {
         Map<String, Object> extra = (Map<String, Object>) rec[COL_EXTRA];
         return switch (field) {
             case "amount" -> (BigDecimal) rec[COL_AMOUNT];
             case "quantity" -> extra.get("quantity") instanceof BigDecimal q ? q : BigDecimal.ONE;
+            case "direction" -> extra.get("direction") instanceof BigDecimal d ? d : BigDecimal.ONE;
             case "unit_price" -> extra.get("unit_price") instanceof BigDecimal p ? p : BigDecimal.ZERO;
             case "open_hours" -> (BigDecimal) rec[COL_AMOUNT];
             default -> extra.get(field) instanceof BigDecimal b ? b : BigDecimal.ONE;
@@ -510,6 +565,7 @@ public class Evaluator {
             case "orders" -> "order";
             case "order_lines" -> "order_line";
             case "refunds" -> "refund";
+            case "refund_attributions" -> "refund_attr";
             case "store_status" -> "store_status";
             default -> source;
         };
@@ -576,6 +632,12 @@ public class Evaluator {
                     Object ch = extra.get("channel");
                     if (ch != null) dims.put("channel", ch.toString());
                 }
+                case "purpose", "link_status", "sku" -> {
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> extra = (Map<String, Object>) rec[COL_EXTRA];
+                    Object v = extra.get(dim);
+                    if (v != null) dims.put(dim, v.toString());
+                }
                 default -> { }
             }
         }
@@ -606,7 +668,7 @@ public class Evaluator {
         List<CellValue.Lineage> included = new ArrayList<>();
         List<CellValue.Lineage> excluded = new ArrayList<>();
 
-        void include(String type, String id, BigDecimal value, String measure) {
+        void include(String type, String id, BigDecimal value, String measure, String reason) {
             count++;
             if (value != null) {
                 sum = sum.add(value);
@@ -614,7 +676,7 @@ public class Evaluator {
                 max = max == null ? value : max.max(value);
                 distinct.add(id);
             }
-            included.add(new CellValue.Lineage(type, id, value, true, null));
+            included.add(new CellValue.Lineage(type, id, value, true, reason));
         }
     }
 }

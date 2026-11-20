@@ -20,6 +20,16 @@ public class EvaluationContext {
     public final LocalDate to;
     public final String grain; // day | month
 
+    /** 当前运行的退款用途（financial / order_batch / reconciliation），未绑定为 null。 */
+    public String purpose;
+
+    /** 退款归属明细账（当前口径版本 + 归属修订 + 用途的已归属行）。 */
+    public List<com.semantic.platform.semantics.RefundAttribution> refundAttributions = new ArrayList<>();
+
+    /** 归属修订：运行固定引用，保证旧报表按原输入复演。 */
+    public Long semanticsId;
+    public Integer attributionRevision;
+
     public List<OrderFact> orders = new ArrayList<>();
     public List<com.semantic.platform.source.OrderLine> orderLines = new ArrayList<>();
     public List<RefundFact> refunds = new ArrayList<>();
@@ -29,8 +39,12 @@ public class EvaluationContext {
     /** source -> 已覆盖的 (storeId, date) 集合。null 的 store 用 "*" 代表全部门店。 */
     public final Map<String, Set<String>> coverage = new HashMap<>();
 
-    /** 引用指标求值缓存：metricKey -> Series */
+    /** 引用指标求值缓存：purpose + metricKey -> Series（缓存键必须含用途，避免串用两种口径） */
     public final Map<String, Series> refCache = new HashMap<>();
+
+    public String refCacheKey(String metricKey) {
+        return (purpose == null ? "-" : purpose) + "::" + metricKey;
+    }
 
     /** 引用指标的定义解析器：metricKey -> Expr（已发布版本） */
     public java.util.function.Function<String, com.semantic.platform.dsl.Expr> refResolver;

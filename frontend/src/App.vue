@@ -14,6 +14,10 @@
           <el-icon><Document /></el-icon>
           <span>指标目录</span>
         </el-menu-item>
+        <el-menu-item index="/semantics">
+          <el-icon><Coin /></el-icon>
+          <span>退款口径</span>
+        </el-menu-item>
         <el-menu-item index="/runs">
           <el-icon><VideoPlay /></el-icon>
           <span>运行结果</span>
@@ -66,7 +70,7 @@
 <script setup>
 import { computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
-import { DataAnalysis, HomeFilled, Document, VideoPlay, Grid, Stamp, FolderOpened, Share, UserFilled } from '@element-plus/icons-vue'
+import { DataAnalysis, HomeFilled, Document, VideoPlay, Grid, Stamp, FolderOpened, Share, UserFilled, Coin } from '@element-plus/icons-vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -82,7 +86,8 @@ const breadcrumbs = computed(() => {
     '/reports': '报表中心',
     '/approvals': '审批中心',
     '/sources': '数据源',
-    '/impact': '影响分析'
+    '/impact': '影响分析',
+    '/semantics': '退款口径'
   }
   const items = []
   if (route.path !== '/') {

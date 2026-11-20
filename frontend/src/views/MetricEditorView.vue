@@ -33,6 +33,15 @@
               </el-select>
             </el-form-item>
           </el-col>
+          <el-col :span="8">
+            <el-form-item label="退款用途">
+              <el-select v-model="form.purpose" clearable placeholder="不绑定（用途模板/非退款指标）">
+                <el-option label="财务发生（按入账日）" value="financial" />
+                <el-option label="运营订单（按原交易日）" value="order_batch" />
+                <el-option label="对账复算（仅校验）" value="reconciliation" />
+              </el-select>
+            </el-form-item>
+          </el-col>
         </el-row>
         <el-form-item label="定义">
           <el-input v-model="form.definition" type="textarea" :rows="12" placeholder="指标定义 JSON" />
@@ -140,6 +149,7 @@ const form = ref({
   metricKey: '',
   name: '',
   grain: 'day',
+  purpose: '',
   definition: ''
 })
 const validation = ref({ ok: false, errors: [] })
@@ -159,6 +169,7 @@ async function loadMetric() {
         metricKey: latest.metricKey,
         name: latest.name || '',
         grain: latest.grain || 'day',
+        purpose: latest.boundPurpose || '',
         definition: latest.definitionJson
       }
     }
@@ -173,7 +184,8 @@ async function validate() {
     const res = await api.post('/metrics/validate', {
       metricKey: form.value.metricKey,
       definition: form.value.definition,
-      grain: form.value.grain
+      grain: form.value.grain,
+      purpose: form.value.purpose || null
     })
     validation.value = res.data
     if (res.data.ok) {
@@ -193,6 +205,7 @@ async function saveDraft() {
       metricKey: form.value.metricKey,
       name: form.value.name,
       grain: form.value.grain,
+      purpose: form.value.purpose || null,
       definition: form.value.definition
     })
     ElMessage.success('草稿保存成功')

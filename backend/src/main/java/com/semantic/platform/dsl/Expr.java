@@ -41,8 +41,14 @@ public sealed interface Expr {
     /** 币种换算：把 amount 从 from 换算到 to（显式，校验器据此允许相加） */
     record Convert(Expr expr, String fromCurrency, String toCurrency, double rate) implements Expr {}
 
-    /** 引用其他已发布指标（按 metric_key，运行期固定到其已发布版本） */
-    record Ref(String metric) implements Expr {}
+    /**
+     * 引用其他已发布指标（按 metric_key，运行期固定到其已发布版本）。
+     * purpose 为可选的“退款用途”语义参数：financial（财务发生）/ order_batch（运营订单）。
+     * 单用途运行中只能继承运行用途；只有对账（reconciliation）用途的运行才允许显式引用两种用途。
+     */
+    record Ref(String metric, String purpose) implements Expr {
+        public Ref(String metric) { this(metric, null); }
+    }
 
     /**
      * 同店增长：以 base 指标在两个比较期（当前期 vs 对比期）上做队列比较。

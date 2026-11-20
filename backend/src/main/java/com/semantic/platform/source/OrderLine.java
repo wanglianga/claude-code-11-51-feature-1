@@ -37,6 +37,10 @@ public class OrderLine {
     @Column(name = "created_batch")
     private Long createdBatch;
 
+    /** 来源修订：原订单/订单行被更正时递增，迟到更正据此只标出受影响的用途与期间。 */
+    @Column(name = "source_revision", nullable = false)
+    private Integer sourceRevision = 1;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getLineId() { return lineId; }
@@ -57,4 +61,7 @@ public class OrderLine {
     public void setAmount(BigDecimal amount) { this.amount = amount; }
     public Long getCreatedBatch() { return createdBatch; }
     public void setCreatedBatch(Long createdBatch) { this.createdBatch = createdBatch; }
+
+    public Integer getSourceRevision() { return sourceRevision; }
+    public void setSourceRevision(Integer sourceRevision) { this.sourceRevision = sourceRevision; }
 }

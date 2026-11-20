@@ -36,6 +36,21 @@ public final class SourceRegistry {
                     "amount", new FieldDef("amount", MetricType.ValueKind.AMOUNT, "CNY", false),
                     "business_date", new FieldDef("business_date", MetricType.ValueKind.TIMESTAMP, null, false)
             ),
+            "refund_attributions", Map.ofEntries(
+                    Map.entry("refund_id", new FieldDef("refund_id", MetricType.ValueKind.QUANTITY, null, false)),
+                    Map.entry("order_id", new FieldDef("order_id", MetricType.ValueKind.QUANTITY, null, false)),
+                    Map.entry("order_line_id", new FieldDef("order_line_id", MetricType.ValueKind.QUANTITY, null, true)),
+                    Map.entry("store_id", new FieldDef("store_id", MetricType.ValueKind.QUANTITY, null, false)),
+                    Map.entry("amount", new FieldDef("amount", MetricType.ValueKind.AMOUNT, "CNY", false)),
+                    Map.entry("quantity", new FieldDef("quantity", MetricType.ValueKind.QUANTITY, null, true)),
+                    Map.entry("direction", new FieldDef("direction", MetricType.ValueKind.QUANTITY, null, false)),
+                    Map.entry("business_date", new FieldDef("business_date", MetricType.ValueKind.TIMESTAMP, null, true)),
+                    Map.entry("posting_date", new FieldDef("posting_date", MetricType.ValueKind.TIMESTAMP, null, false)),
+                    Map.entry("original_business_date", new FieldDef("original_business_date", MetricType.ValueKind.TIMESTAMP, null, true)),
+                    Map.entry("purpose", new FieldDef("purpose", MetricType.ValueKind.QUANTITY, null, false)),
+                    Map.entry("link_status", new FieldDef("link_status", MetricType.ValueKind.QUANTITY, null, false)),
+                    Map.entry("sku", new FieldDef("sku", MetricType.ValueKind.QUANTITY, null, true))
+            ),
             "refunds", Map.of(
                     "refund_id", new FieldDef("refund_id", MetricType.ValueKind.QUANTITY, null, false),
                     "order_id", new FieldDef("order_id", MetricType.ValueKind.QUANTITY, null, false),
@@ -62,6 +77,7 @@ public final class SourceRegistry {
             "orders", "business_date",
             "order_lines", "business_date",
             "refunds", "business_date",
+            "refund_attributions", "business_date",
             "store_status", "business_date",
             "holidays", "holiday_date"
     );
@@ -71,6 +87,7 @@ public final class SourceRegistry {
             "orders", "store_id",
             "order_lines", "store_id",
             "refunds", "store_id",
+            "refund_attributions", "store_id",
             "store_status", "store_id"
     );
 

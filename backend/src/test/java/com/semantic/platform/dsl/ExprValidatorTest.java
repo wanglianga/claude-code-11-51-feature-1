@@ -117,6 +117,55 @@ class ExprValidatorTest {
     }
 
     @Test
+    void testRawRefundAggregationRejected() throws Exception {
+        // 原始退款事实没有时间口径，直接聚合应被拒绝
+        Expr expr = parse("{\"op\":\"agg\",\"measure\":\"sum\",\"expr\":{\"op\":\"field\",\"source\":\"refunds\",\"field\":\"amount\"},\"by\":[\"store_id\"]}");
+        ExprValidator v = new ExprValidator(Map.of(), Map.of(), MetricType.TimeGrain.DAY,
+                "financial", Map.of(), Set.of("net_sales_financial"), Set.of());
+        ExprValidator.Result res = new ExprValidator.Result();
+        v.infer(expr, "$", res);
+        assertFalse(res.ok(), "原始退款事实必须经时间口径归属");
+        assertTrue(res.errors.stream().anyMatch(e -> e.message().contains("原始退款事实")), "应提示使用归属来源");
+    }
+
+    @Test
+    void testAttributionSourceRequiresPurpose() throws Exception {
+        // 归属来源在未绑定用途时拒绝编译（不能只引用无用途的模板名）
+        Expr expr = parse("{\"op\":\"agg\",\"measure\":\"sum\",\"expr\":{\"op\":\"field\",\"source\":\"refund_attributions\",\"field\":\"amount\"},\"by\":[\"store_id\"]}");
+        ExprValidator v = new ExprValidator(Map.of(), Map.of(), MetricType.TimeGrain.DAY,
+                null, Map.of(), Set.of(), Set.of());
+        ExprValidator.Result res = new ExprValidator.Result();
+        v.infer(expr, "$", res);
+        assertFalse(res.ok(), "未选择用途应拒绝编译");
+    }
+
+    @Test
+    void testPurposeMismatchRejected() throws Exception {
+        // 财务发生运行中引用 order_batch 用途 -> 两种口径不可比
+        Map<String, MetricType> published = Map.of(
+                "net_sales_order_batch", amountType("CNY", MetricType.TimeGrain.DAY));
+        Expr expr = parse("{\"op\":\"ref\",\"metric\":\"net_sales_order_batch\",\"purpose\":\"order_batch\"}");
+        ExprValidator v = new ExprValidator(published, Map.of(), MetricType.TimeGrain.DAY,
+                "financial", Map.of(), Set.of("net_sales_order_batch"), Set.of());
+        ExprValidator.Result res = new ExprValidator.Result();
+        v.infer(expr, "$", res);
+        assertFalse(res.ok(), "跨用途引用应被拒绝");
+        assertTrue(res.errors.stream().anyMatch(e -> e.message().contains("混用不同退款用途")), "应提示用途不可混用");
+    }
+
+    @Test
+    void testReconciliationAllowsBothPurposes() throws Exception {
+        Map<String, MetricType> published = Map.of(
+                "net_sales_order_batch", amountType("CNY", MetricType.TimeGrain.DAY));
+        Expr expr = parse("{\"op\":\"ref\",\"metric\":\"net_sales_order_batch\",\"purpose\":\"order_batch\"}");
+        ExprValidator v = new ExprValidator(published, Map.of(), MetricType.TimeGrain.DAY,
+                "reconciliation", Map.of(), Set.of("net_sales_order_batch"), Set.of());
+        ExprValidator.Result res = new ExprValidator.Result();
+        v.infer(expr, "$", res);
+        assertTrue(res.ok(), "对账运行允许引用两种用途做独立复算: " + res.errors);
+    }
+
+    @Test
     void testRatioTypeInference() throws Exception {
         // 金额 / 数量 = 单价（金额）
         Map<String, MetricType> published = Map.of(

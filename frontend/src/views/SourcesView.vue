@@ -45,6 +45,29 @@
         </el-table>
       </el-card>
 
+      <!-- 原订单行更正（迟到更正） -->
+      <el-card class="replay-card" shadow="never">
+        <template #header>
+          <span>原订单行更正（迟到更正）</span>
+        </template>
+        <el-form :inline="true" :model="correctForm">
+          <el-form-item label="订单行">
+            <el-input v-model="correctForm.lineId" placeholder="如 L081" />
+          </el-form-item>
+          <el-form-item label="新营业日">
+            <el-date-picker v-model="correctForm.businessDate" type="date" value-format="YYYY-MM-DD" />
+          </el-form-item>
+          <el-form-item>
+            <el-button type="warning" @click="correctLine">更正</el-button>
+          </el-form-item>
+        </el-form>
+        <el-alert v-if="correctResult" type="warning" :closable="false" show-icon>
+          <template #title>更正只标出受影响的用途与期间</template>
+          <div>归属修订: {{ correctResult.impact?.attributionRevisionBefore }} → {{ correctResult.impact?.attributionRevisionAfter }}</div>
+          <div>受影响: {{ JSON.stringify(correctResult.impact?.affected || {}) }}</div>
+        </el-alert>
+      </el-card>
+
       <!-- 迟到退款回放 -->
       <el-card class="replay-card" shadow="never">
         <template #header>
@@ -57,14 +80,26 @@
           <el-form-item label="订单ID">
             <el-input v-model="replayForm.orderId" placeholder="如 O001" />
           </el-form-item>
+          <el-form-item label="原订单行">
+            <el-input v-model="replayForm.orderLineId" placeholder="如 L011（留空 => 待归属）" />
+          </el-form-item>
           <el-form-item label="门店">
             <el-input v-model="replayForm.storeId" placeholder="如 S001" />
           </el-form-item>
           <el-form-item label="营业日期">
             <el-date-picker v-model="replayForm.businessDate" type="date" placeholder="选择日期" />
           </el-form-item>
+          <el-form-item label="原交易日">
+            <el-date-picker v-model="replayForm.originalBusinessDate" type="date" value-format="YYYY-MM-DD" placeholder="可留空取订单行营业日" />
+          </el-form-item>
           <el-form-item label="金额">
             <el-input-number v-model="replayForm.amount" :min="0" :precision="2" />
+          </el-form-item>
+          <el-form-item label="方向">
+            <el-radio-group v-model="replayForm.direction">
+              <el-radio :value="1">退款扣减</el-radio>
+              <el-radio :value="-1">退款撤销</el-radio>
+            </el-radio-group>
           </el-form-item>
           <el-form-item>
             <el-button type="primary" @click="replayLateRefund">回放迟到退款</el-button>
@@ -72,8 +107,11 @@
         </el-form>
         <el-alert v-if="replayResult" type="success" :closable="false" show-icon>
           <template #title>回放完成</template>
+          <div>关联状态: {{ replayResult.linkStatus }}</div>
+          <div>归属修订: {{ replayResult.impact?.attributionRevisionBefore }} → {{ replayResult.impact?.attributionRevisionAfter }}</div>
           <div>影响指标: {{ replayResult.impact?.affectedMetrics?.join(', ') }}</div>
-          <div>生成候选: {{ replayResult.impact?.candidates?.length }} 个</div>
+          <div>受影响用途/期间: {{ JSON.stringify(replayResult.impact?.affectedPurposesPeriods || {}) }}</div>
+          <div>生成候选: {{ replayResult.impact?.candidates?.length }} 个（已发布报表仍引用原运行）</div>
         </el-alert>
       </el-card>
     </el-card>
@@ -91,10 +129,15 @@ const replayForm = ref({
   refundId: '',
   orderId: '',
   storeId: '',
+  orderLineId: '',
   businessDate: null,
+  originalBusinessDate: null,
+  direction: 1,
   amount: 0
 })
 const replayResult = ref(null)
+const correctForm = ref({ lineId: '', businessDate: null })
+const correctResult = ref(null)
 
 async function loadBatches() {
   try {
@@ -128,14 +171,30 @@ async function replayLateRefund() {
     const res = await api.post('/replay/late-refund', {
       refundId: replayForm.value.refundId,
       orderId: replayForm.value.orderId,
+      orderLineId: replayForm.value.orderLineId,
       storeId: replayForm.value.storeId,
       businessDate: replayForm.value.businessDate ? new Date(replayForm.value.businessDate).toISOString().split('T')[0] : null,
+      originalBusinessDate: replayForm.value.originalBusinessDate || null,
+      direction: replayForm.value.direction,
       amount: replayForm.value.amount
     })
     replayResult.value = res.data
     ElMessage.success('回放完成，已生成运行候选')
   } catch (e) {
     ElMessage.error('回放失败: ' + (e.response?.data?.error || e.message))
+  }
+}
+
+async function correctLine() {
+  try {
+    const res = await api.post(`/sources/order-lines/${correctForm.value.lineId}/correct`, {
+      businessDate: correctForm.value.businessDate,
+      reason: '原订单行更正'
+    })
+    correctResult.value = res.data
+    ElMessage.success('更正完成，已生成新归属修订与影响标记')
+  } catch (e) {
+    ElMessage.error('更正失败: ' + (e.response?.data?.error || e.message))
   }
 }
 

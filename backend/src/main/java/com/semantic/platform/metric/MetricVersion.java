@@ -40,6 +40,14 @@ public class MetricVersion {
     @Column(name = "published_at")
     private OffsetDateTime publishedAt;
 
+    /** 是否“用途参数模板”：定义中引用退款时间口径，运行时必须固定 financial / order_batch。 */
+    @Column(name = "purpose_required", nullable = false)
+    private Boolean purposeRequired = false;
+
+    /** 已绑定用途（单用途定义）：模板类指标为空，要求下游显式传参。 */
+    @Column(name = "bound_purpose")
+    private String boundPurpose;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getMetricKey() { return metricKey; }
@@ -60,4 +68,8 @@ public class MetricVersion {
     public void setCreatedAt(OffsetDateTime createdAt) { this.createdAt = createdAt; }
     public OffsetDateTime getPublishedAt() { return publishedAt; }
     public void setPublishedAt(OffsetDateTime publishedAt) { this.publishedAt = publishedAt; }
+    public Boolean getPurposeRequired() { return purposeRequired == null ? Boolean.FALSE : purposeRequired; }
+    public void setPurposeRequired(Boolean purposeRequired) { this.purposeRequired = purposeRequired; }
+    public String getBoundPurpose() { return boundPurpose; }
+    public void setBoundPurpose(String boundPurpose) { this.boundPurpose = boundPurpose; }
 }

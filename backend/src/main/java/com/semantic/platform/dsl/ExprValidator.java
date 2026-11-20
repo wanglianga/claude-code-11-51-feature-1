@@ -35,6 +35,24 @@ public class ExprValidator {
     private final Map<String, Set<String>> publishedRefs;
     /** 当前指标的声明粒度（day/month），用于粒度一致性校验。 */
     private final MetricType.TimeGrain currentGrain;
+    /**
+     * 当前编译上下文的退款用途。null = 未绑定用途（定义模板/仅保存草稿），
+     * 此时不允许引用“退款时间口径”来源，必须先固定 financial / order_batch。
+     */
+    private final String purpose;
+    /** 口径版本一致性：用途 -> 口径版本（来自已发布指标），编译期拒绝跨版本的混用。 */
+    private final Map<String, String> publishedSemantics;
+    /** 指标 -> 是否退款用途绑定（防止未选择用途就引用无用途模板名）。 */
+    private final Set<String> purposeBoundMetrics;
+    /** 对账指标：只有对账运行允许引用两种用途做独立复算。 */
+    private final Set<String> reconciliationMetrics;
+
+    public static final String PURPOSE_FINANCIAL = "financial";
+    public static final String PURPOSE_ORDER_BATCH = "order_batch";
+    public static final String PURPOSE_RECONCILIATION = "reconciliation";
+    public static final String SOURCE_REFUND_ATTRIBUTIONS = "refund_attributions";
+    /** 用途模板的编译哨兵：允许两种用途共存，但每个退款引用仍必须写明用途。 */
+    public static final String PURPOSE_TEMPLATE = "__template__";
 
     public ExprValidator(Map<String, MetricType> publishedTypes,
                          Map<String, Set<String>> publishedRefs) {
@@ -44,9 +62,23 @@ public class ExprValidator {
     public ExprValidator(Map<String, MetricType> publishedTypes,
                          Map<String, Set<String>> publishedRefs,
                          MetricType.TimeGrain currentGrain) {
+        this(publishedTypes, publishedRefs, currentGrain, null, Map.of(), Set.of(), Set.of());
+    }
+
+    public ExprValidator(Map<String, MetricType> publishedTypes,
+                         Map<String, Set<String>> publishedRefs,
+                         MetricType.TimeGrain currentGrain,
+                         String purpose,
+                         Map<String, String> publishedSemantics,
+                         Set<String> purposeBoundMetrics,
+                         Set<String> reconciliationMetrics) {
         this.publishedTypes = publishedTypes;
         this.publishedRefs = publishedRefs;
         this.currentGrain = currentGrain;
+        this.purpose = purpose;
+        this.publishedSemantics = publishedSemantics;
+        this.purposeBoundMetrics = purposeBoundMetrics;
+        this.reconciliationMetrics = reconciliationMetrics;
     }
 
     /** 收集表达式中直接引用的指标 key。 */
@@ -154,6 +186,15 @@ public class ExprValidator {
         if (def == null) {
             r.error(path, "来源 '" + f.source() + "' 不存在字段 '" + f.field() + "'");
             return MetricType.bool();
+        }
+        // 原始退款事实没有“用途”：必须先经退款时间口径归属，禁止直接按原始入账日聚合。
+        if ("refunds".equals(f.source())) {
+            r.error(path, "原始退款事实没有时间口径，禁止直接聚合。请使用来源 '" + SOURCE_REFUND_ATTRIBUTIONS
+                    + "' 并显式绑定用途（financial 按入账日 / order_batch 按原交易日）");
+        }
+        // 归属来源必须固定用途；未选择用途时拒绝编译。
+        if (SOURCE_REFUND_ATTRIBUTIONS.equals(f.source()) && (purpose == null || purpose.isBlank())) {
+            r.error(path, "退款时间口径指标必须固定用途参数 financial 或 order_batch，不能只引用无用途的模板名");
         }
         // 字段的时间粒度继承当前指标的声明粒度
         return new MetricType(def.kind(), def.currency(), currentGrain, Set.of());
@@ -309,7 +350,32 @@ public class ExprValidator {
             r.error(path, "引用的指标 '" + ref.metric() + "' 不存在或未发布");
             return MetricType.bool();
         }
+        boolean targetBound = purposeBoundMetrics.contains(ref.metric());
+        String refPurpose = ref.purpose();
+        if (refPurpose != null && !refPurpose.isBlank()) {
+            if (!PURPOSE_FINANCIAL.equals(refPurpose) && !PURPOSE_ORDER_BATCH.equals(refPurpose)) {
+                r.error(path, "引用用途只能是 financial 或 order_batch，得到 '" + refPurpose + "'");
+                return t;
+            }
+            if (!targetBound) {
+                r.error(path, "指标 '" + ref.metric() + "' 不是退款用途绑定指标，不能指定用途参数");
+            }
+            if (knownPurposeMismatch(refPurpose)) {
+                r.error(path, "同一表达式/消费端不能混用不同退款用途"
+                        + (purpose == null ? "" : "（当前用途 " + purpose + "，引用用途 " + refPurpose + "）")
+                        + "：两种口径不可比，请拆成两个指标");
+            }
+        }
+        // 未写用途的引用继承运行用途（用途参数模板）；运行期若未选择用途会在 RunService 被拒绝，
+        // 报表发布也要求每项写明用途与口径引用身份，因此下游无法只按无用途模板名消费。
         return t;
+    }
+
+    /** 当前用途与引用用途是否冲突；对账运行允许同时引用两种用途。 */
+    private boolean knownPurposeMismatch(String refPurpose) {
+        if (purpose == null || purpose.isBlank()) return false;
+        if (PURPOSE_RECONCILIATION.equals(purpose) || PURPOSE_TEMPLATE.equals(purpose)) return false;
+        return !purpose.equals(refPurpose);
     }
 
     private MetricType inferCohort(Expr.Cohort c, String path, Result r) {

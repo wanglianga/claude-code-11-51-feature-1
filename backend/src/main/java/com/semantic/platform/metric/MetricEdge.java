@@ -21,6 +21,10 @@ public class MetricEdge {
     @Column(name = "edge_type", nullable = false)
     private String edgeType = "ref";
 
+    /** 依赖边固定的退款用途：下游按用途区分依赖，不同用途的同名引用不算同一条链。 */
+    @Column(name = "purpose")
+    private String purpose;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getFromMetric() { return fromMetric; }
@@ -31,4 +35,6 @@ public class MetricEdge {
     public void setFromVersion(Integer fromVersion) { this.fromVersion = fromVersion; }
     public String getEdgeType() { return edgeType; }
     public void setEdgeType(String edgeType) { this.edgeType = edgeType; }
+    public String getPurpose() { return purpose; }
+    public void setPurpose(String purpose) { this.purpose = purpose; }
 }

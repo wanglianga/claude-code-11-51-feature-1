@@ -31,10 +31,11 @@ services:
       db:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "curl -f http://localhost:8080/api/metrics || exit 1"]
+      # JRE 基础镜像不一定带 curl；用 bash 的 /dev/tcp 检查 8080 是否可连接
+      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080' || exit 1"]
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 12
 
   frontend:
     build: ./frontend

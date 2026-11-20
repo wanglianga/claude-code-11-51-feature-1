@@ -45,6 +45,16 @@ public class Approval {
 
     private String note;
 
+    /** 审批固定用途与口径版本：批准即发布同一口径，不允许并发修改用途后自动切换。 */
+    @Column(name = "purpose")
+    private String purpose;
+
+    @Column(name = "semantics_id")
+    private Long semanticsId;
+
+    @Column(name = "profile_version")
+    private Integer profileVersion;
+
     public Long getId() { return id; }
     public void setId(Long id) { this.id = id; }
     public String getMetricKey() { return metricKey; }
@@ -69,4 +79,10 @@ public class Approval {
     public void setDecidedAt(OffsetDateTime decidedAt) { this.decidedAt = decidedAt; }
     public String getNote() { return note; }
     public void setNote(String note) { this.note = note; }
+    public String getPurpose() { return purpose; }
+    public void setPurpose(String purpose) { this.purpose = purpose; }
+    public Long getSemanticsId() { return semanticsId; }
+    public void setSemanticsId(Long semanticsId) { this.semanticsId = semanticsId; }
+    public Integer getProfileVersion() { return profileVersion; }
+    public void setProfileVersion(Integer profileVersion) { this.profileVersion = profileVersion; }
 }

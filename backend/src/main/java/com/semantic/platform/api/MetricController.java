@@ -40,7 +40,8 @@ public class MetricController {
             definition = String.valueOf(defObj);
         }
         String grain = body.get("grain") == null ? "day" : (String) body.get("grain");
-        return metricService.validateWithGrain(metricKey, definition, grain);
+        String purpose = body.get("purpose") == null ? null : body.get("purpose").toString();
+        return metricService.validateForPurpose(metricKey, definition, grain, purpose);
     }
 
     @PostMapping
@@ -49,7 +50,7 @@ public class MetricController {
         return metricService.saveDraft(
                 body.get("metricKey"), body.get("name"), body.get("description"),
                 body.getOrDefault("grain", "day"), body.get("definition"),
-                user == null ? "system" : user);
+                user == null ? "system" : user, body.get("purpose"));
     }
 
     @PostMapping("/{key}/publish")
@@ -72,5 +73,10 @@ public class MetricController {
     @GetMapping("/{key}/published")
     public MetricVersion published(@PathVariable String key) {
         return metricService.publishedVersion(key);
+    }
+
+    @GetMapping("/{key}/releases")
+    public List<com.semantic.platform.metric.MetricRelease> releases(@PathVariable String key) {
+        return metricService.releases(key);
     }
 }
